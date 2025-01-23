@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS clicks (
+    id SERIAL PRIMARY KEY,
+    button_id VARCHAR(50),
+    clicked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+); 
