@@ -1,4 +1,16 @@
 services:
+  reverse-ports:
+    image: traefik:v3.1
+    command: 
+     - "--api.insecure=true" # allow access to the dashboard
+     - "--providers.docker"
+    ports:
+      - "80:80"
+      - "8080:8080" # traefik dashboard
+    volumes:
+    # allow traefik to monitor docker containers
+      - /var/run/docker.sock:/var/run/docker.sock 
+
   web:
     build: ./app
     ports:
@@ -6,19 +18,39 @@ services:
     environment:
       - PYTHONUNBUFFERED=0
       - PYTHONPATH=/app
-      - DATABASE_URL=postgresql://user:password@db:5432/clickdb
+    command: >
+      sh -c "export DATABASE_URL=postgresql://`cat /run/secrets/postgres_user`:`cat /run/secrets/postgres_password`@db:5432/clickdb &&
+             python sample_app.py"
     depends_on:
       - db
+    secrets:
+      - postgres_password
+      - postgres_user
 
   db:
     image: postgres:16
+    healthcheck:
+      test: ["CMD", "pg_isready"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER_FILE=/run/secrets/postgres_user
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
       - POSTGRES_DB=clickdb
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
       - postgres_data:/var/lib/postgresql/data
+    secrets:
+      - postgres_password
+      - postgres_user
 
 volumes:
-  postgres_data: 
+  postgres_data:
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  postgres_user:
+    file: ./secrets/postgres_user.txt 

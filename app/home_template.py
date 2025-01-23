@@ -3,7 +3,7 @@ HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Click Logger</title>
+    <title>Balloon de Oro </title>
     <style>
         button { margin: 10px; padding: 10px; }
         table { margin-top: 20px; border-collapse: collapse; }
