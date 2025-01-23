@@ -13,8 +13,6 @@ services:
 
   web:
     build: ./app
-    ports:
-      - "8087:8087"
     environment:
       - PYTHONUNBUFFERED=0
       - PYTHONPATH=/app
