@@ -14,7 +14,7 @@ services:
   web:
     build: ./app
     labels:
-      - "traefik.http.routers.web.rule=Host(`147.93.52.73`)"
+      - "traefik.http.routers.web.rule=Host(`${DOMAIN_NAME}`)"
       - "traefik.http.services.web.loadbalancer.server.port=8087"
     environment:
       - PYTHONUNBUFFERED=0
