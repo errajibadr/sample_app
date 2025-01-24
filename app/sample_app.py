@@ -66,5 +66,17 @@ async def get_stats():
     return jsonify(stats)
 
 
+@app.route("/health")
+async def health():
+    try:
+        # Vérifier la connexion à la base de données
+        pool = await get_db_pool()
+        async with pool.acquire() as conn:
+            await conn.execute("SELECT 1")
+        return jsonify({"status": "healthy"}), 200
+    except Exception:
+        return jsonify({"status": "unhealthy"}), 500
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8087)

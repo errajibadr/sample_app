@@ -22,6 +22,16 @@ services:
 
   web:
     build: ./app
+    restart: on-failure
+    deploy:
+      mode: replicated
+      replicas: 3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.web.entrypoints=web"
@@ -40,7 +50,8 @@ services:
       sh -c "export DATABASE_URL=postgresql://`cat /run/secrets/postgres_user`:`cat /run/secrets/postgres_password`@db:5432/clickdb &&
              python sample_app.py"
     depends_on:
-      - db
+      db : 
+        condition : service_healthy
     secrets:
       - postgres_password
       - postgres_user
