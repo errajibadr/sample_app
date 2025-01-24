@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 RUN apt-get update && \
     apt-get install -y curl && \
@@ -6,8 +6,12 @@ RUN apt-get update && \
 
 WORKDIR /app
 COPY requirements.txt .
+
+# Add pip trusted host to handle potential SSL issues
 RUN pip install -r requirements.txt
 
 COPY . .
 
-CMD ["python", "sample_app.py"] 
+ENV PYTHONPATH=/app
+
+CMD ["python", "sample_api.py"] 

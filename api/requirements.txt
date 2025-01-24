@@ -2,4 +2,5 @@ flask
 psycopg2-binary
 aioflask
 asyncpg
-quart 
+quart
+quart-cors

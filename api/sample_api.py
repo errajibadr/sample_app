@@ -1,10 +1,11 @@
 import os
 
 import asyncpg
-from home_template import HTML_TEMPLATE
-from quart import Quart, g, jsonify, render_template_string
+from quart import Quart, g, jsonify
+from quart_cors import cors  # Pour gérer les CORS
 
 app = Quart(__name__)
+app = cors(app, allow_origin="*")  # Permettre les requêtes cross-origin
 
 
 async def get_db_pool():
@@ -22,7 +23,7 @@ async def close_db_pool(exc):
 
 @app.route("/")
 async def home():
-    return await render_template_string(HTML_TEMPLATE)
+    return jsonify({"message": "Balloon de Oro API"})
 
 
 @app.route("/log-click/<button_id>", methods=["POST"])

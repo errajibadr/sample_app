@@ -1,2 +1,9 @@
 .venv
 secrets/
+.env
+
+
+.acme
+letsencrypt
+
+__pycache__
