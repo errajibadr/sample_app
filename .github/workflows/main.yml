@@ -57,7 +57,9 @@ jobs:
           context: ./api
           file: ./api/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/sample_api:latest
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/sample_api:latest
+            ghcr.io/${{ github.repository_owner }}/sample_api:${{ github.sha }}
           
       - name: Build and push UI image
         uses: docker/build-push-action@v5
@@ -65,4 +67,6 @@ jobs:
           context: ./web_app
           file: ./web_app/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/sample_ui:latest 
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/sample_ui:latest
+            ghcr.io/${{ github.repository_owner }}/sample_ui:${{ github.sha }} 
