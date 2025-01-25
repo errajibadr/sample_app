@@ -86,7 +86,7 @@ jobs:
           uses: cssnr/stack-deploy-action@v1
           with:
             host: ${{ secrets.VPS_HOST }}
-            user: deploy
+            user: 'deploy'
             ssh_key: ${{ secrets.VPS_DEPLOY_PRIVATE_KEY }}
             file: 'docker-stack.yml'
             name: 'sample_app_stack'
