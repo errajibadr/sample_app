@@ -50,8 +50,7 @@ services:
       sh -c "export DATABASE_URL=postgresql://`cat /run/secrets/postgres_user`:`cat /run/secrets/postgres_password`@db:5432/clickdb &&
              python sample_api.py"
     depends_on:
-      db : 
-        condition : service_healthy
+      - db
     secrets:
       - postgres_password
       - postgres_user
