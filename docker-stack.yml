@@ -25,7 +25,14 @@ services:
     restart: on-failure
     deploy:
       mode: replicated
-      replicas: 1
+      replicas: 3
+      update_config:
+        order: start-first
+        failure_action: rollback
+        delay: 10s
+      rollback_config:
+        parallelism: 1
+        delay: 10s
       restart_policy:
         condition: any
         delay: 5s
@@ -38,10 +45,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.api.entrypoints=web"
-      - "traefik.http.routers.api.rule=PathPrefix(`/api/v1`)"
+      - "traefik.http.routers.api.rule=Host(`${DOMAIN_NAME}`)&&PathPrefix(`/api/v1`)"
       - "traefik.http.routers.api.middlewares=strip-prefix@docker,redirect-to-https@docker"
       - "traefik.http.routers.api-secure.entrypoints=websecure"
-      - "traefik.http.routers.api-secure.rule=PathPrefix(`/api/v1`)"
+      - "traefik.http.routers.api-secure.rule=Host(`${DOMAIN_NAME}`)&&PathPrefix(`/api/v1`)"
       - "traefik.http.routers.api-secure.middlewares=strip-prefix@docker"
       - "traefik.http.routers.api-secure.tls=true"
       - "traefik.http.routers.api-secure.tls.certresolver=letsencrypt"
