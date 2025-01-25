@@ -1,0 +1,107 @@
+services:
+  reverse-ports:
+    image: traefik:v3.1
+    command: 
+     - "--api.insecure=true" # allow access to the dashboard
+     - "--providers.docker"
+     - "--providers.docker.exposedbydefault=false" # don't expose all containers by default
+     - "--entrypoints.web.address=:80" # listen on port 80
+     - "--entrypoints.websecure.address=:443" # listen on port 443
+     - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+     - "--certificatesresolvers.letsencrypt.acme.email=myemail@gmail.com"
+     - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "443:443"
+      - "80:80"
+      - "8080:8080" # traefik dashboard
+    volumes:
+    # allow traefik to monitor docker containers
+      - /var/run/docker.sock:/var/run/docker.sock 
+      - ./letsencrypt:/letsencrypt
+
+
+  api:
+    image: ghcr.io/errajibadr/sample_api:${COMMIT_HASH:-latest}
+    restart: on-failure
+    deploy:
+      mode: replicated
+      replicas: 1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.entrypoints=web"
+      - "traefik.http.routers.api.rule=Host(`${DOMAIN_NAME}`)&&PathPrefix(`/api/v1`)"
+      - "traefik.http.routers.api.middlewares=redirect-to-https@docker"
+      - "traefik.http.routers.api-secure.entrypoints=websecure"
+      - "traefik.http.routers.api-secure.rule=Host(`${DOMAIN_NAME}`)&&PathPrefix(`/api/v1`)"
+      - "traefik.http.routers.api-secure.tls=true"
+      - "traefik.http.routers.api-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.services.api-service.loadbalancer.server.port=8087"
+    environment:
+      - PYTHONUNBUFFERED=0
+      - PYTHONPATH=/app
+    command: >
+      sh -c "export DATABASE_URL=postgresql://`cat /run/secrets/postgres_user`:`cat /run/secrets/postgres_password`@db:5432/clickdb &&
+             python sample_api.py"
+    depends_on:
+      db : 
+        condition : service_healthy
+    secrets:
+      - postgres_password
+      - postgres_user
+
+  db:
+    image: postgres:16
+    healthcheck:
+      test: ["CMD", "pg_isready"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+    environment:
+      - POSTGRES_USER_FILE=/run/secrets/postgres_user
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
+      - POSTGRES_DB=clickdb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    secrets:
+      - postgres_password
+      - postgres_user
+
+  ui:
+    image: ghcr.io/errajibadr/sample_ui:${COMMIT_HASH:-latest}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.web.entrypoints=web"
+      - "traefik.http.routers.web.rule=Host(`${DOMAIN_NAME}`)"
+      - "traefik.http.routers.web.middlewares=redirect-to-https@docker"
+      - "traefik.http.routers.web-secure.entrypoints=websecure"
+      - "traefik.http.routers.web-secure.rule=Host(`${DOMAIN_NAME}`)"
+      - "traefik.http.routers.web-secure.tls=true"
+      - "traefik.http.routers.web-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.services.web-service.loadbalancer.server.port=8501"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+
+secrets:
+  postgres_password:
+    external: true
+  postgres_user:
+    external: true

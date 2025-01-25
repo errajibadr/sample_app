@@ -70,3 +70,24 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/sample_ui:latest
             ghcr.io/${{ github.repository_owner }}/sample_ui:${{ github.sha }} 
+
+  deploy:
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    steps:
+        - uses: actions/checkout@v4
+
+        - name: Create env file
+          run: |
+            echo "DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}" > docker-stack.env
+            echo "COMMIT_HASH=${{ github.sha }}" >> docker-stack.env
+      
+        - name: 'VPS Stack Deploy'
+          uses: cssnr/stack-deploy-action@v1
+          with:
+            host: ${{ secrets.VPS_HOST }}
+            user: deploy
+            ssh_key: ${{ secrets.VPS_DEPLOY_PRIVATE_KEY }}
+            file: 'docker-stack.yml'
+            name: 'sample_app_stack'
+            env_file: 'docker-stack.env'

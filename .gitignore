@@ -2,6 +2,7 @@
 secrets/
 .env
 
+deploy_key*
 
 .acme
 letsencrypt
