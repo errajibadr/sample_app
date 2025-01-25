@@ -4,4 +4,7 @@ aioflask
 asyncpg
 quart
 quart-cors
-
+pytest
+pytest-asyncio
+ruff
+pre-commit 
