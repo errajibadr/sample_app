@@ -2,7 +2,7 @@ import pandas as pd
 import requests
 import streamlit as st
 
-API_URL = "http://api:8087/api/v1"  # URL du service API avec le préfixe correspondant à Traefik
+API_URL = "http://api:8087/"  # URL du service API avec le préfixe correspondant à Traefik
 
 st.title("🏆 Balloon de Oro")
 
