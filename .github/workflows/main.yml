@@ -98,10 +98,13 @@ jobs:
         run: |
           scp docker-stack.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:~/docker-stack.yml
           scp .env ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:~/.env
+          scp init.sql ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:~/init.sql
 
       - name: Deploy to VPS
         run: |
           ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "\
+            DOMAIN_NAME=${{ secrets.DOMAIN_NAME }} \
+            COMMIT_HASH=${{ github.sha }} \
             docker stack deploy \
             --with-registry-auth \
             --compose-file docker-stack.yml \

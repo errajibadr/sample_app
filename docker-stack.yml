@@ -17,7 +17,7 @@ services:
     volumes:
     # allow traefik to monitor docker containers
       - /var/run/docker.sock:/var/run/docker.sock 
-      - ./letsencrypt:/letsencrypt
+      - letsencrypt_data:/letsencrypt
 
 
   api:
@@ -74,7 +74,10 @@ services:
       - POSTGRES_DB=clickdb
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - type: bind
+        source: /home/deploy/init.sql
+        target: /docker-entrypoint-initdb.d/init.sql
+        read_only: true
     secrets:
       - postgres_password
       - postgres_user
@@ -103,6 +106,7 @@ services:
 
 volumes:
   postgres_data:
+  letsencrypt_data:
 
 secrets:
   postgres_password:
