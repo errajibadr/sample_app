@@ -4,4 +4,4 @@ aioflask
 asyncpg
 quart
 quart-cors
-
+prometheus-client

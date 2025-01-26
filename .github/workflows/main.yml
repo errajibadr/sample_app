@@ -99,6 +99,7 @@ jobs:
           scp docker-stack.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:~/docker-stack.yml
           scp .env ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:~/.env
           scp init.sql ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:~/init.sql
+          scp monitoring/prometheus/prometheus.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:~/prometheus.yml
 
       - name: Deploy to VPS
         run: |

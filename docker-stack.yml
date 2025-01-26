@@ -22,7 +22,6 @@ services:
 
   api:
     image: ghcr.io/errajibadr/sample_api:${COMMIT_HASH:-latest}
-    restart: on-failure
     deploy:
       mode: replicated
       replicas: 3
@@ -82,7 +81,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - type: bind
-        source: /home/deploy/init.sql
+        source: ./init.sql
         target: /docker-entrypoint-initdb.d/init.sql
         read_only: true
     secrets:
@@ -111,12 +110,109 @@ services:
     depends_on:
       - api
 
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.external-url=https://${DOMAIN_NAME}/prometheus'
+      # - '--web.route-prefix=/prometheus'
+    volumes:
+      - type: bind
+        source: ./monitoring/prometheus/prometheus.yml
+        target: /etc/prometheus/prometheus.yml
+        read_only: true
+      - prometheus_data:/prometheus
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`/prometheus`)"
+      - "traefik.http.routers.prometheus.tls=true"
+      - "traefik.http.routers.prometheus.tls.certresolver=letsencrypt"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+  
+  node-exporter: # 1860
+    image: prom/node-exporter:latest
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    deploy:
+      mode: global
+    networks:
+      - default
+
+  cadvisor: # 193 good , 14282 recent 
+    image: gcr.io/cadvisor/cadvisor:latest
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      mode: global
+    command:
+      - '--docker_only=true'
+      - '--disable_metrics=disk,diskIO,network,tcp,udp,percpu,sched,process'
+
+
+  postgres-exporter: # 9628
+    image: prometheuscommunity/postgres-exporter:latest
+    environment:
+      DATA_SOURCE_URI: db:5432/clickdb?sslmode=disable
+      DATA_SOURCE_USER_FILE: /run/secrets/postgres_user
+      DATA_SOURCE_PASS_FILE: /run/secrets/postgres_password
+    command:
+      - '--web.listen-address=:9187'
+    secrets:
+      - postgres_user
+      - postgres_password
+    deploy:
+      mode: replicated
+      replicas: 1
+  
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_admin_password
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SERVER_ROOT_URL=https://${DOMAIN_NAME}/grafana
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`/grafana`)"
+      - "traefik.http.routers.grafana.tls=true"
+      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+    secrets:
+      - grafana_admin_password
+
 volumes:
   postgres_data:
   letsencrypt_data:
+  prometheus_data:
+  grafana_data:
 
 secrets:
   postgres_password:
     external: true
   postgres_user:
     external: true
+  grafana_admin_password:
+    external: true
+

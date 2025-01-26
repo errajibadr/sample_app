@@ -1,11 +1,26 @@
 import os
+import time
 
 import asyncpg
-from quart import Quart, g, jsonify
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from quart import Quart, Response, g, jsonify, request
 from quart_cors import cors  # Pour gérer les CORS
 
 app = Quart(__name__)
 app = cors(app, allow_origin="*")  # Permettre les requêtes cross-origin
+
+
+# Définition des métriques Prometheus
+REQUESTS = Counter(
+    "api_requests_total", "Total number of API requests", ["method", "endpoint", "status"]
+)
+
+LATENCY = Histogram(
+    "api_request_duration_seconds",
+    "Request duration in seconds",
+    ["method", "endpoint"],
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0],
+)
 
 
 async def get_db_pool():
@@ -19,6 +34,31 @@ async def close_db_pool(exc):
     if hasattr(g, "db_pool"):
         pool = g.db_pool
         await pool.close()
+
+
+@app.before_request
+async def before_request():
+    g.start_time = time.time()
+
+
+@app.after_request
+async def after_request(response):
+    # Calculer la latence
+    latency = time.time() - g.start_time
+
+    # Enregistrer les métriques
+    REQUESTS.labels(
+        method=request.method, endpoint=request.endpoint, status=response.status_code
+    ).inc()
+
+    LATENCY.labels(method=request.method, endpoint=request.endpoint).observe(latency)
+
+    return response
+
+
+@app.route("/metrics")
+async def metrics():
+    return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
 
 
 @app.route("/")
