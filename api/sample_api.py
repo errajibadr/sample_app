@@ -9,18 +9,9 @@ from quart_cors import cors  # Pour gérer les CORS
 app = Quart(__name__)
 app = cors(app, allow_origin="*")  # Permettre les requêtes cross-origin
 
-
-# Définition des métriques Prometheus
-REQUESTS = Counter(
-    "api_requests_total", "Total number of API requests", ["method", "endpoint", "status"]
-)
-
-LATENCY = Histogram(
-    "api_request_duration_seconds",
-    "Request duration in seconds",
-    ["method", "endpoint"],
-    buckets=[0.1, 0.5, 1.0, 2.0, 5.0],
-)
+# Utiliser des dictionnaires pour stocker les métriques par endpoint
+requests_metrics = {}
+latency_metrics = {}
 
 
 async def get_db_pool():
@@ -43,15 +34,31 @@ async def before_request():
 
 @app.after_request
 async def after_request(response):
+    endpoint = request.endpoint
+    method = request.method
+
+    # Créer les métriques pour cet endpoint si elles n'existent pas encore
+    metric_key = f"{method}_{endpoint}"
+    if metric_key not in requests_metrics:
+        requests_metrics[metric_key] = Counter(
+            "api_requests_total", "Total number of API requests", ["method", "endpoint", "status"]
+        )
+        latency_metrics[metric_key] = Histogram(
+            "api_request_duration_seconds",
+            "Request duration in seconds",
+            ["method", "endpoint"],
+            buckets=[0.1, 0.5, 1.0, 2.0, 5.0],
+        )
+
     # Calculer la latence
     latency = time.time() - g.start_time
 
     # Enregistrer les métriques
-    REQUESTS.labels(
-        method=request.method, endpoint=request.endpoint, status=response.status_code
+    requests_metrics[metric_key].labels(
+        method=method, endpoint=endpoint, status=response.status_code
     ).inc()
 
-    LATENCY.labels(method=request.method, endpoint=request.endpoint).observe(latency)
+    latency_metrics[metric_key].labels(method=method, endpoint=endpoint).observe(latency)
 
     return response
 
