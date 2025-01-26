@@ -8,3 +8,4 @@ pytest
 pytest-asyncio
 ruff
 pre-commit 
+prometheus-client
