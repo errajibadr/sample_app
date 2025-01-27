@@ -3,42 +3,11 @@ import time
 
 import asyncpg
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, Summary, generate_latest
-from quart import Quart, Response, g, jsonify
+from quart import Quart, Response, g, jsonify, request
 from quart_cors import cors  # Pour gérer les CORS
 
 app = Quart(__name__)
 app = cors(app, allow_origin="*")  # Permettre les requêtes cross-origin
-
-# Définir les métriques une seule fois au niveau global
-REQUEST_COUNT = Counter(
-    "api_requests_total", "Total number of API requests", ["endpoint", "method", "status"]
-)
-
-REQUEST_LATENCY = Histogram(
-    "api_request_duration_seconds",
-    "Request duration in seconds",
-    ["endpoint", "method"],
-    buckets=[0.1, 0.5, 1.0, 2.0, 5.0],
-)
-
-
-async def get_db_pool():
-    if not hasattr(g, "db_pool"):
-        g.db_pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], min_size=1, max_size=10)
-    return g.db_pool
-
-
-@app.teardown_appcontext
-async def close_db_pool(exc):
-    if hasattr(g, "db_pool"):
-        pool = g.db_pool
-        await pool.close()
-
-
-@app.before_request
-async def before_request():
-    g.start_time = time.time()
-
 
 # Define metrics with more specific names and labels
 HTTP_REQUEST_TOTAL = Counter(
@@ -68,6 +37,43 @@ DB_REQUEST_DURATION_SECONDS = Histogram(
     ["query_type"],
     buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 2.0],
 )
+
+
+async def get_db_pool():
+    if not hasattr(g, "db_pool"):
+        g.db_pool = await asyncpg.create_pool(os.environ["DATABASE_URL"], min_size=1, max_size=10)
+    return g.db_pool
+
+
+@app.teardown_appcontext
+async def close_db_pool(exc):
+    if hasattr(g, "db_pool"):
+        pool = g.db_pool
+        await pool.close()
+
+
+@app.before_request
+async def before_request():
+    g.start_time = time.time()
+
+
+@app.after_request
+async def after_request(response):
+    # Calculate request duration
+    duration = time.time() - g.start_time
+
+    # Get endpoint and method
+    endpoint = request.endpoint or "unknown"
+    method = request.method
+
+    # Record metrics with more specific labels
+    HTTP_REQUEST_TOTAL.labels(endpoint=endpoint, method=method, status=response.status_code).inc()
+
+    HTTP_REQUEST_DURATION_SECONDS.labels(endpoint=endpoint, method=method).observe(duration)
+
+    HTTP_REQUEST_SUMMARY.labels(endpoint=endpoint, method=method).observe(duration)
+
+    return response
 
 
 @app.route("/metrics")
