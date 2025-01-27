@@ -2,16 +2,24 @@ import os
 import time
 
 import asyncpg
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, Summary, generate_latest
 from quart import Quart, Response, g, jsonify, request
 from quart_cors import cors  # Pour gérer les CORS
 
 app = Quart(__name__)
 app = cors(app, allow_origin="*")  # Permettre les requêtes cross-origin
 
-# Utiliser des dictionnaires pour stocker les métriques par endpoint
-requests_metrics = {}
-latency_metrics = {}
+# Définir les métriques une seule fois au niveau global
+REQUEST_COUNT = Counter(
+    "api_requests_total", "Total number of API requests", ["endpoint", "method", "status"]
+)
+
+REQUEST_LATENCY = Histogram(
+    "api_request_duration_seconds",
+    "Request duration in seconds",
+    ["endpoint", "method"],
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0],
+)
 
 
 async def get_db_pool():
@@ -32,35 +40,34 @@ async def before_request():
     g.start_time = time.time()
 
 
-@app.after_request
-async def after_request(response):
-    endpoint = request.endpoint
-    method = request.method
+# Define metrics with more specific names and labels
+HTTP_REQUEST_TOTAL = Counter(
+    "http_requests_total", "Total number of HTTP requests", ["endpoint", "method", "status"]
+)
 
-    # Créer les métriques pour cet endpoint si elles n'existent pas encore
-    metric_key = f"{method}_{endpoint}"
-    if metric_key not in requests_metrics:
-        requests_metrics[metric_key] = Counter(
-            "api_requests_total", "Total number of API requests", ["method", "endpoint", "status"]
-        )
-        latency_metrics[metric_key] = Histogram(
-            "api_request_duration_seconds",
-            "Request duration in seconds",
-            ["method", "endpoint"],
-            buckets=[0.1, 0.5, 1.0, 2.0, 5.0],
-        )
+HTTP_REQUEST_DURATION_SECONDS = Histogram(
+    "http_request_duration_seconds",
+    "HTTP request duration in seconds",
+    ["endpoint", "method"],
+    buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0],
+)
 
-    # Calculer la latence
-    latency = time.time() - g.start_time
+# Add summary metrics for better statistical analysis
+HTTP_REQUEST_SUMMARY = Summary(
+    "http_request_summary_seconds", "HTTP request latency summary", ["endpoint", "method"]
+)
 
-    # Enregistrer les métriques
-    requests_metrics[metric_key].labels(
-        method=method, endpoint=endpoint, status=response.status_code
-    ).inc()
+# Database metrics
+DB_CONNECTION_TOTAL = Counter(
+    "db_connections_total", "Total number of database connections created"
+)
 
-    latency_metrics[metric_key].labels(method=method, endpoint=endpoint).observe(latency)
-
-    return response
+DB_REQUEST_DURATION_SECONDS = Histogram(
+    "db_request_duration_seconds",
+    "Database request duration in seconds",
+    ["query_type"],
+    buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 2.0],
+)
 
 
 @app.route("/metrics")
